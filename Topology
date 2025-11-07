@@ -1,0 +1,15 @@
+[Internet]
+|
+(Host Internet) -- VirtualBox NAT
+|
+pfSense VM (Adapter1:NAT -> WAN, Adapter2: Internal -> LAN: labnet)
+|
+Internal Network (labnet)
+├── Kali VM (Internal)
+└── Ubuntu Server VM (Internal) -> Safeline app
+
+pfSense handles NAT, DHCP, DNS, firewall rules, and optional IDS/IPS (Suricata).
+
+Kali and Ubuntu live on an Internal Network (e.g., labnet) and never bridge directly to the host LAN.
+
+Safeline runs on the Ubuntu VM (or in a container on the Ubuntu VM).
