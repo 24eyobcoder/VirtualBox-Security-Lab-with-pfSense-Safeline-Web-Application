@@ -1,0 +1,302 @@
+1) VirtualBox VM: create pfSense VM
+
+Open VirtualBox → New.
+
+Name: pfSense
+
+Type: BSD → FreeBSD (64-bit)
+
+Memory: 1024 MB (1 GB) — increase to 2048 MB if you plan IDS/IPS.
+
+Create virtual disk: VDI, dynamically allocated, 10–20 GB.
+
+Settings → System → Processor: 1 vCPU (upgrade to 2 later if needed).
+
+Settings → Display: Video Memory 16–32 MB.
+
+Settings → Storage: mount the pfSense ISO to the optical drive.
+
+Network adapters (important):
+
+Adapter 1: Enable → Attached to: NAT (this will be WAN)
+
+Adapter 2: Enable → Attached to: Internal Network → Name: labnet (this will be LAN)
+
+Disable Adapters 3 & 4.
+
+Settings → General → Advanced: Shared Clipboard and Drag & Drop → Disabled.
+
+Settings → Shared Folders: ensure none are set.
+
+2) Boot and run pfSense installer
+
+Start the VM. When the pfSense ISO boots, choose Install pfSense (press Enter).
+
+Language: choose (e.g., English).
+
+Keymap: accept default (or choose yours).
+
+Partitioning: choose Auto (UFS) (default).
+
+Confirm and let the installer run; it copies files and installs.
+
+When install finishes, it asks to reboot — remove the ISO from VirtualBox before rebooting: VirtualBox menu → Devices → Optical Drives → Remove disk from virtual drive. Reboot the VM.
+
+3) Initial console configuration (assign interfaces + LAN IP)
+
+When pfSense boots you’ll see the console menu. Follow these steps:
+
+Assign Interfaces
+
+Type 1 and press Enter (Assign Interfaces) if prompted.
+
+The installer will list detected NICs (e.g., em0, em1).
+
+Set WAN = em0 (should map to NAT) and LAN = em1 (maps to Internal Network labnet).
+
+If asked about VLANs, answer n for now.
+
+Set interface(s) IP address
+
+Type 2 and press Enter.
+
+Choose LAN.
+
+Enter new IPv4 address: 192.168.10.1
+
+Subnet bit count: 24
+
+IPv6? → n (unless you need IPv6)
+
+When prompted, enable DHCP server on LAN? → y
+
+Start: 192.168.10.10
+
+End: 192.168.10.100
+
+Confirm settings. The console should now show:
+
+WAN -> em0 -> v4/DHCP4: 10.0.2.15 (example)
+LAN -> em1 -> v4: 192.168.10.1/24
+
+4) Access the pfSense Web GUI (first-time wizard)
+
+From a VM on labnet (e.g., Kali) open a browser to:
+https://192.168.10.1
+(self-signed cert — accept warning).
+
+Login: default admin / pfsense (change ASAP).
+
+The Setup Wizard will open. Recommended fields:
+
+Hostname: pfsense
+
+Domain: lab.local
+
+Primary DNS: 8.8.8.8
+
+Secondary DNS: 1.1.1.1
+
+Timezone: set correctly
+
+WAN Type: DHCP (VirtualBox NAT supplies it). LAN should remain 192.168.10.1/24.
+
+Set a strong admin password. Finish & Apply.
+
+5) Basic verification (from a lab VM)
+
+On a lab VM (Kali / Ubuntu) after DHCP:
+
+ip a            # should show 192.168.10.x
+ping -c3 192.168.10.1   # pfSense LAN
+ping -c3 8.8.8.8         # external IP
+ping -c3 google.com      # domain name (DNS)
+
+
+If DNS fails but IP ping works, check DNS settings below.
+
+6) DNS setup & DNS Resolver
+
+Web UI → System → General Setup: ensure DNS servers 8.8.8.8 and 1.1.1.1 are listed (no gateway). Save.
+
+Web UI → Services → DNS Resolver:
+
+Ensure Enable DNS Resolver is checked.
+
+Network Interfaces: All
+
+Outgoing Network Interfaces: All
+
+Save & Apply.
+
+Optional: Services → DNS Forwarder (if you prefer forwarder instead).
+
+7) NAT (Outbound) configuration
+
+Web UI → Firewall → NAT → Outbound
+
+Default is Automatic outbound NAT. Keep it unless you need specific rules.
+
+If you need explicit control, set to Hybrid or Manual and create an outbound NAT for LAN net → translate to WAN address.
+
+8) Firewall rules (LAN)
+
+By default pfSense allows LAN → any. If you need to ensure, do this:
+
+Web UI → Firewall → Rules → LAN
+
+Add a rule (Add at top):
+
+Action: Pass
+
+Protocol: Any
+
+Source: LAN subnet (or LAN net)
+
+Destination: any
+
+Description: Allow LAN to any
+
+Save → Apply Changes.
+
+To isolate lab from host/home LAN (recommended safety rule): Add a block rule above the allow rule:
+
+Action: Block
+
+Source: LAN subnet
+
+Destination: 192.168.1.0/24 (or your host LAN)
+
+Description: Block Lab -> Home LAN
+Save & Apply (ensure Block rule is above the Allow).
+
+9) DHCP static mappings (reserve IPs)
+
+Web UI → Services → DHCP Server → LAN
+
+Under Static DHCP Mappings for this interface, click Add.
+
+MAC Address: paste the VM NIC MAC (from ip a or VirtualBox)
+
+IP Address: e.g., 192.168.10.11 for Ubuntu
+
+Hostname: ubuntu-server
+
+Save & Apply. Clients will get reserved IPs.
+
+10) Securing the pfSense GUI & Admin
+
+Web UI → System → Advanced → Admin Access
+
+Change webConfigurator port from 443 to a non-standard port (optional)
+
+Check Disable webConfigurator redirect rule if you want stricter control.
+
+Ensure webConfigurator listens on LAN only (do NOT bind to WAN).
+
+System → User Manager: ensure admin has a strong password. Consider creating another admin user and disabling the default.
+
+Diagnostics → Backup & Restore → Export configuration immediately (download config.xml and store offline).
+
+11) Enabling SSH (optional for headless admin)
+
+System → Advanced → Admin Access → SSH: enable if you need remote shell.
+
+Prefer using key authentication; disable password root login if possible.
+
+Save & Apply.
+
+12) Install IDS/IPS (Suricata) — optional (requires more CPU/RAM)
+
+System → Package Manager → Available Packages → search Suricata (or Snort) → Install.
+
+After install: Services → Suricata → Interfaces → Add → Interface: LAN.
+
+Rulesets: select ET Open or other feed you prefer.
+
+Start Suricata on LAN and monitor logs.
+
+If Suricata consumes too much CPU, increase pfSense vCPUs and memory.
+
+13) Logging & monitoring
+
+Status → System Logs → Firewall: check logs for blocked/allowed traffic.
+
+Status → Traffic Graphs: view bandwidth usage.
+
+Consider sending logs to a remote syslog server for long-term retention.
+
+14) Backup / snapshot best practices
+
+In VirtualBox, take a snapshot of pfSense (clean state) before any risky changes.
+
+Use pfSense → Diagnostics → Backup & Restore → Download config.xml regularly.
+
+Store backups outside the host (encrypted storage recommended).
+
+15) Useful console commands (pfSense shell: option 8)
+
+Show interfaces: ifconfig
+
+Show routes: netstat -rn
+
+Ping: ping -c 3 8.8.8.8
+
+View logs: clog /var/log/system.log
+
+Rebuild package index or check package status via Web UI or pkg.
+
+16) Troubleshooting checklist
+
+No WAN IP: Ensure pfSense Adapter1 is NAT and VM has internet on host; reboot pfSense.
+
+LAN clients get no DHCP: Check Services → DHCP Server → LAN is enabled and range fits subnet.
+
+DNS resolution fails: Ensure DNS Resolver enabled and system DNS servers set under System → General Setup. Also check clients’ /etc/resolv.conf.
+
+VMs can reach home router (not isolated): Check VirtualBox adapters — Kali/Ubuntu must be Internal Network only and pfSense must be the only VM with NAT/Bridged access. Also add a pfSense firewall block rule for your home LAN (192.168.1.0/24).
+
+pfSense VM fails to start (VBox error): Check host virtualization (VT-x/AMD-V), vboxdrv status, and that Hyper-V/KVM aren’t blocking VirtualBox.
+
+17) Example common tasks (commands & UI paths)
+
+Reboot pfSense: Diagnostics → Reboot
+
+Apply config changes: Use Save then Apply Changes in GUI whenever prompted.
+
+Export pfSense config: Diagnostics → Backup & Restore → Download config.xml
+
+Restore config: Diagnostics → Backup & Restore → Choose file → Restore (be careful — this can overwrite interfaces)
+
+18) Post-install hardening checklist (summary)
+
+Disable GUI on WAN (bind webConfigurator to LAN only).
+
+Change admin username/password and enable 2FA if available.
+
+Disable SSH on WAN and use key auth.
+
+Disable unnecessary services.
+
+Take snapshots and export config.
+
+Create firewall block rules to protect the host/home LAN.
+
+Monitor logs and consider IDS/IPS on LAN.
+
+19) Quick copyable checklist to run now
+
+Create VM with Adapter1=NAT Adapter2=Internal(labnet).
+
+Install pfSense (Auto UFS). Reboot and remove ISO.
+
+Console: Assign interfaces (WAN=em0, LAN=em1). Set LAN IP 192.168.10.1/24. Enable DHCP 192.168.10.10–192.168.10.100.
+
+GUI: https://192.168.10.1
+ → run wizard → set DNS 8.8.8.8, 1.1.1.1.
+
+Firewall → Rules → LAN → add Block LAN net → 192.168.1.0/24 (top). Add Pass LAN net → any (below). Apply.
+
+Test from Kali/Ubuntu: ping 192.168.10.1, ping 8.8.8.8, ping google.com.
+
+Backup config & take VirtualBox snapshot.
