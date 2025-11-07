@@ -1,0 +1,13 @@
+Disable VirtualBox shared folders and clipboard between host and VMs.
+
+Run VirtualBox as non-admin user on host.
+
+Take snapshots of clean state for pfSense and servers.
+
+Limit pfSense GUI to LAN only.
+
+Create DHCP static mappings in pfSense for servers.
+
+Add firewall rules to block lab → host LAN (192.168.1.0/24) as a safety block.
+
+Install Suricata (or Snort) in pfSense for IDS/IPS on the LAN interface.
