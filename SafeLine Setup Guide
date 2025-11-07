@@ -1,0 +1,434 @@
+Web Application Firewall Home Lab using SafeLine WAF
+
+How SafeLine Works
+SafeLine WAF protects web services by blocking malicious HTTP traffic through its Nginx-based reverse proxy architecture, creating a security barrier between your applications and the Internet.
+
+
+Table of Contents
+Introduction
+
+Prerequisites
+
+Lab Environment Setup
+3.1. Download and Install VirtualBox
+3.2. Create the Kali Linux Virtual Machine
+3.3. Create the Ubuntu Server Virtual Machine
+3.4. Enable Bridged Networking
+3.5. Install Guest Additions (Optional but Recommended)
+
+Ubuntu Server Configuration
+4.1. Initial System Updates and Installations
+4.2. Installing and Configuring LAMP Stack
+4.3. Installing and Configuring Damn Vulnerable Web App (DVWA)
+4.4. Changing the DVWA Listening Port to 8080
+4.5. Adding Custom Values to the DVWA Database
+
+DNS Resolution Setup
+5.1. Using /etc/hosts for Local Resolution
+5.2. (Optional) Installing and Configuring BIND DNS Server
+
+Creating a Self-Signed SSL Certificate
+
+Installing and Configuring SafeLine WAF
+7.1. Automatic Deployment
+7.2. Importing the Self-Signed Certificate
+7.3. Onboarding the DVWA Application
+
+Demonstrating SQL Injection from Kali Linux
+8.1. Launching the Attack
+8.2. Observing SafeLine WAF Protection
+
+SafeLine WAF Advanced Configurations
+9.1. HTTP Flood Defense
+9.2. Authentication Sign-In
+9.3. Custom Deny Rules (Blocking Kali IP)
+
+Conclusion and Further Exploration
+Lab Handbook: Final Notes
+
+1. Introduction
+In this lab, we will build a complete cybersecurity home lab using VirtualBox, Kali Linux, Ubuntu, and SafeLine WAF. The goal is to:
+
+Set up a vulnerable web application (DVWA) on Ubuntu.
+
+Demonstrate how to perform a basic SQL injection attack from Kali Linux.
+
+Show how SafeLine WAF protects against such attacks.
+
+Explore additional SafeLine WAF security measures (HTTP flood defense, custom deny rules, etc.).
+
+Note: If you encounter any errors during your home lab setup while following this guide, please refer to the internet for solutions to your specific issue.
+
+Refer to the YouTube video for any guidance: https://youtu.be/N0dEC1nuWCQ
+
+2. Prerequisites
+Host Machine with sufficient RAM (at least 8 GB recommended) and disk space (at least 50 GB free).
+
+Internet Connection for downloading software and updates.
+
+Basic Linux Command Line Knowledge (to install packages, edit configuration files, etc.).
+
+3. Lab Environment Setup
+3.1. Download and Install VirtualBox
+Download VirtualBox
+
+Go to the official VirtualBox download page: https://www.virtualbox.org/wiki/Downloads
+
+Select the version for your host OS (Windows, macOS, Linux).
+
+Install VirtualBox
+
+Run the downloaded installer and follow the on-screen instructions.
+
+Optionally, install the VirtualBox Extension Pack for additional features (USB 2.0/3.0, etc.).
+
+3.2. Create the Kali Linux Virtual Machine
+Download Kali Linux
+
+Official Kali Linux download site: https://www.kali.org/get-kali
+
+Choose the ISO file for your architecture (64-bit is most common).
+
+Create a New VM in VirtualBox
+
+Name: KaliLinux
+
+Type: Linux
+
+Version: Debian (64-bit)
+
+Memory: At least 2 GB (2048 MB)
+
+Hard Disk: Create a virtual hard disk (dynamically allocated), ~20 GB recommended.
+
+Attach the Kali ISO & Install
+
+Go to Settings > Storage, attach the Kali ISO under the “IDE” controller.
+
+Start the VM, follow the Kali Linux installation steps (graphical install recommended).
+
+Set up a username and password you will remember (e.g., kali / kali).
+
+3.3. Create the Ubuntu Server Virtual Machine
+Download Ubuntu Server
+
+Official Ubuntu download site: https://ubuntu.com/download/server
+
+Choose the latest LTS release (e.g., 22.04 LTS).
+
+Create a New VM in VirtualBox
+
+Name: UbuntuServer
+
+Type: Linux
+
+Version: Ubuntu (64-bit)
+
+Memory: At least 2 GB (2048 MB)
+
+Hard Disk: ~20 GB (dynamically allocated).
+
+Attach the Ubuntu ISO & Install
+
+Under Settings > Storage, attach the Ubuntu ISO file.
+
+Start the VM, follow the Ubuntu Server installation instructions.
+
+Create a username/password (e.g., ubuntu / ubuntu).
+
+Note: You may optionally install the OpenSSH server during installation if you want to access the VM remotely.
+
+3.4. Enable internal Networking
+To have the VMs appear on the same network as your host (and each other):
+
+Open VirtualBox > select your VM (e.g., UbuntuServer) > Settings > Network.
+
+Adapter 1: Choose internal Adapter from the “Attached to” drop-down.
+
+Select your host’s network interface (Ethernet or Wi-Fi).
+
+Click OK.
+
+Grab the IP address of the machine after you install net-tools in section 4 by running the command ifconfig from the terminal.
+
+Repeat for the Kali Linux VM as well.
+
+3.5. Install Guest Additions (Optional but Recommended)
+With the VM running, go to Devices > Insert Guest Additions CD Image in the VirtualBox window.
+
+Follow on-screen instructions, or mount the CD and install manually using the commands below:
+
+bash
+sudo apt-get update
+sudo apt-get install build-essential dkms linux-headers-$(uname -r)
+sudo mount /dev/cdrom /media/cdrom
+sudo /media/cdrom/VBoxLinuxAdditions.run
+Restart the VM.
+
+Note: Guest Additions can help with screen resizing, shared clipboard, and shared folders.
+
+4. Ubuntu Server Configuration
+4.1. Initial System Updates and Installations
+Update the Package List and Upgrade:
+
+bash
+sudo apt-get update
+sudo apt-get upgrade -y
+Install Net-Tools (for ifconfig and other network utilities):
+
+bash
+sudo apt-get install -y net-tools
+Install OpenSSL:
+
+bash
+sudo apt-get install -y openssl
+4.2. Installing and Configuring LAMP Stack
+Install Apache2, PHP, and MySQL:
+
+bash
+sudo apt-get install -y apache2 php php-mysql mysql-server
+Secure the MySQL Installation (optional but recommended):
+
+bash
+sudo mysql_secure_installation
+Follow the prompts (set a root password, remove anonymous users, disable remote root login, etc.).
+
+4.3. Installing and Configuring Damn Vulnerable Web App (DVWA)
+Clone DVWA (or download):
+
+bash
+cd /var/www/html
+sudo git clone https://github.com/digininja/DVWA.git
+If git is not installed, install it first: sudo apt-get install -y git
+
+Set File Permissions:
+
+bash
+sudo chown -R www-data:www-data DVWA
+sudo chmod -R 755 DVWA
+Configure DVWA Database:
+DVWA has a config file at DVWA/config/config.inc.php. Update it if necessary:
+
+php
+$DBMS = 'MySQL';
+$db = 'dvwa';
+$user = 'dvwa_user';
+$pass = 'p@ssw0rd';
+$host = 'localhost';
+Create a new database and user in MySQL:
+
+bash
+sudo mysql -u root -p
+sql
+CREATE DATABASE dvwa;
+CREATE USER 'dvwa_user'@'localhost' IDENTIFIED BY 'p@ssw0rd';
+GRANT ALL ON dvwa.* TO 'dvwa_user'@'localhost';
+FLUSH PRIVILEGES;
+exit;
+Initialize DVWA:
+Navigate to http://<Ubuntu IP>/DVWA/setup.php in your browser.
+Click "Create/Reset Database".
+
+4.4. Changing the DVWA Listening Port to 8080
+By default, Apache listens on port 80. To change it to 8080:
+
+Edit the Apache Configuration:
+
+bash
+sudo nano /etc/apache2/ports.conf
+Change Listen 80 to Listen 8080.
+
+Update the default Virtual Host (optional if you want the default site on 8080):
+
+bash
+sudo nano /etc/apache2/sites-available/000-default.conf
+Change <VirtualHost *:80> to <VirtualHost *:8080>.
+
+Restart Apache:
+
+bash
+sudo systemctl restart apache2
+Now DVWA is accessible at http://<Ubuntu IP>:8080/DVWA.
+
+4.5. Adding Custom Values to the DVWA Database
+You can add custom data to the DVWA database to demonstrate SQL injection:
+
+Log in to MySQL:
+
+bash
+sudo mysql -u root -p
+Add a sample table/entries:
+
+sql
+USE dvwa;
+
+CREATE TABLE test_users (
+    id INT NOT NULL AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL,
+    password VARCHAR(50) NOT NULL,
+    PRIMARY KEY (id)
+);
+
+INSERT INTO test_users (username, password) VALUES
+('alice', 'alice123'),
+('bob', 'bob123'),
+('admin', 'admin123');
+
+exit;
+These entries give you something to target with SQL injection experiments.
+
+5. DNS Resolution Setup
+5.1. Using /etc/hosts for Local Resolution
+Edit /etc/hosts on Both Ubuntu and Kali:
+
+bash
+sudo nano /etc/hosts
+Add a Line (replace <Ubuntu IP> with the actual IP address):
+
+text
+<Ubuntu IP>    dvwa.local
+Now you can access the DVWA app at http://dvwa.local:8080/DVWA in your browser (on Kali).
+
+5.2. (Optional) Installing and Configuring BIND DNS Server
+If you prefer a dedicated DNS server:
+
+Install BIND9:
+
+bash
+sudo apt-get install -y bind9
+Configure a Zone File:
+Edit /etc/bind/named.conf.local:
+
+bash
+zone "dvwa.local" {
+    type master;
+    file "/etc/bind/zones/db.dvwa.local";
+};
+Create the zone directory if not present:
+
+bash
+sudo mkdir -p /etc/bind/zones
+Create the zone file /etc/bind/zones/db.dvwa.local:
+
+text
+;
+; BIND data file for dvwa.local
+;
+$TTL    604800
+@       IN      SOA     ns.dvwa.local. admin.dvwa.local. (
+                        1         ; Serial
+                        604800    ; Refresh
+                        86400     ; Retry
+                        2419200   ; Expire
+                        604800 )  ; Negative Cache TTL
+;
+@       IN      NS      ns.dvwa.local.
+ns      IN      A       <Ubuntu IP>
+www     IN      A       <Ubuntu IP>
+Restart BIND:
+
+bash
+sudo systemctl restart bind9
+Configure Kali to Use the Ubuntu IP for DNS:
+Edit /etc/resolv.conf (or NetworkManager settings):
+
+text
+nameserver <Ubuntu IP>
+Test with:
+
+bash
+dig www.dvwa.local
+6. Creating a Self-Signed SSL Certificate
+
+On Ubuntu, create a self-signed certificate to use for HTTPS:
+
+bash
+sudo mkdir /etc/ssl/dvwa
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+-keyout /etc/ssl/dvwa/dvwa.key \
+-out /etc/ssl/dvwa/dvwa.crt
+Follow the prompts to complete the certificate creation.
+
+7. Installing and Configuring SafeLine WAF
+
+7.1. Automatic Deployment
+Head to the following website https://ly.safepoint.cloud/zfYZD3l and select “Install”.
+
+SafeLine WAF typically provides an automatic install script. Follow the steps below for the automatic install:
+
+Use the following command on your Ubuntu CLI:
+
+bash
+bash -c "$(curl -fsSLk https://waf.chaitin.com/release/latest/manager.sh)" -- --en
+Follow On-Screen Prompts to complete installation.
+
+You will be provided with an admin password and username as well as the URL to access Safeline, typically on port 9443.
+
+Once you log in, it is highly recommended to upgrade to a PRO license. You can choose to do a 7-day trial from https://ly.safepoint.cloud/zfYZD3l. You can also choose a longer-term subscription. Use the code below for 5% off:
+ZFGYUXVXABSUH7KTMQG4FG4B
+
+7.2. Importing the Self-Signed Certificate
+In the SafeLine WAF interface (web UI or config files), import the .crt and .key files you created under the SSL certificate section.
+
+Certificate File: /etc/ssl/dvwa/dvwa.crt
+
+Key File: /etc/ssl/dvwa/dvwa.key
+
+Follow the SafeLine documentation on how to manage certificates (it could be through a GUI or CLI).
+
+7.3. Onboarding the DVWA Application
+Use the SafeLine WAF management console or interface to add a new application:
+
+Add the DNS name - www.dvwa.local or whatever Domain name you have selected.
+
+Backend URL (Reverse Proxy): http://<UbuntuIP>:8080
+
+Delete port 80 and only leave port 443.
+
+Virtual Host (for WAF): e.g., dvwa-waf.local or re-use the same domain.
+
+Attach the SSL Certificate (if you want the WAF to serve HTTPS).
+
+8. Demonstrating SQL Injection from Kali Linux
+8.1. Launching the Attack
+Open Kali Linux and browse to the DVWA site (This will now be redirected to https):
+http://dvwa.local/
+
+Log In to DVWA (default credentials in DVWA are admin / password unless changed).
+
+Set DVWA Security Level to low (in the DVWA Security tab).
+
+Go to SQL Injection Section and try typical SQL injection strings (e.g., admin' OR '1'='1).
+
+8.2. Observing SafeLine WAF Protection
+SafeLine WAF should detect and block malicious injection attempts. Look for WAF logs to see blocked SQL injection attempts. You can also see error or block pages if the WAF is in blocking mode.
+
+9. SafeLine WAF Advanced Configurations
+Refer to the YouTube video for any guidance: https://youtu.be/N0dEC1nuWCQ
+
+9.1. HTTP Flood Defense
+Enable HTTP Flood/DoS settings in SafeLine WAF.
+
+Configure Thresholds (requests per second) and Penalty or Ban duration.
+
+Test by sending multiple requests from Kali (e.g., using ab, siege, or other load tools).
+
+9.2. Authentication Sign-In
+Safeline supports an auth gateway:
+
+Enable Auth Sign-In in the WAF policy for DVWA.
+
+Configure username/password or integrate with an external auth provider.
+
+Attempt to access DVWA from Kali; the WAF should prompt for credentials before passing traffic to the server.
+
+9.3. Custom Deny Rules (Blocking Kali IP)
+Identify the IP of your Kali VM (e.g., 192.168.1.50).
+
+Add a Deny Rule in SafeLine WAF:
+
+Match Source IP: 192.168.1.50
+
+Action: Block or Deny.
+
+Test from Kali: You should receive a blocked response.
