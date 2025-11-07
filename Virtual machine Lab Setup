@@ -1,0 +1,77 @@
+Prerequisites (host)
+
+VirtualBox (latest stable)
+
+pfSense ISO (AMD64 installer)
+
+Kali Linux ISO
+
+Ubuntu Server ISO (or your preferred server OS)
+
+Enough RAM/disk (recommended: 16GB host RAM, 50+GB free disk)
+
+1. Create pfSense VM
+
+In VirtualBox → New:
+
+Name: pfSense
+
+Type: BSD → FreeBSD (64-bit)
+
+Memory: 1024–2048 MB (2GB recommended)
+
+Disk: VDI dynamically allocated, 10–20 GB
+
+Storage → Mount pfSense ISO in Optical drive.
+
+Network:
+
+Adapter 1: NAT (WAN)
+
+Adapter 2: Internal Network name: labnet (LAN)
+
+Other settings: disable Shared Clipboard, Drag & Drop, Shared Folders.
+
+Start VM and follow the pfSense installation (choose Install, default Auto (UFS)). Remove ISO after first reboot.
+
+Console: assign interfaces (WAN -> em0, LAN -> em1), set LAN IP to 192.168.10.1/24, enable DHCP (e.g., 192.168.10.10–192.168.10.100).
+
+2. Create Kali VM
+
+New VM → Type: Linux → Debian (64-bit)
+
+Memory: 2048 MB+
+
+Network adapter: Adapter 1 → Internal Network → Name labnet (same as pfSense LAN)
+
+Install Kali and verify ip a shows an IP in 192.168.10.x.
+
+3. Create Ubuntu Server VM (Safeline host)
+
+New VM → Type: Linux → Ubuntu (64-bit)
+
+Memory: 2048+ MB
+
+Adapter 1 → Internal Network labnet (same)
+
+Install Ubuntu Server (enable SSH during install or install later)
+
+4. pfSense GUI initial configuration
+
+From Kali or any machine on labnet, open: https://192.168.10.1
+
+Default user/pass: admin / pfsense (change immediately)
+
+Run wizard: set hostname, domain, WAN as DHCP (VirtualBox NAT supplies it), LAN remains 192.168.10.1.
+
+System → General Setup: set DNS servers (8.8.8.8, 1.1.1.1) and enable DNS Resolver.
+
+5. Test connectivity
+
+From Kali: ip a → should show e.g., 192.168.10.10.
+
+Ping pfSense: ping 192.168.10.1
+
+Ping Internet: ping 8.8.8.8
+
+Ping domain: ping google.com (if DNS OK)
